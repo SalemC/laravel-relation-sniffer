@@ -43,7 +43,9 @@ class GenerateERDiagram extends Command {
             'forceDelete',
         ],
 
-        //
+        // 'App\\Models\\User' => [
+        //     'exampleMethod',
+        // ],
     ];
 
     /**
@@ -53,6 +55,9 @@ class GenerateERDiagram extends Command {
      */
     private $map;
 
+    /**
+     * Construct this class.
+     */
     public function __construct() {
         parent::__construct();
 
@@ -82,6 +87,13 @@ class GenerateERDiagram extends Command {
             }, collect());
     }
 
+    /**
+     * Validate a potential relation method based on its return type.
+     *
+     * @param mixed $returnType The return type of the method.
+     *
+     * @return bool
+     */
     private function validateRelation(mixed $returnType): bool {
         return $returnType !== null && (is_a($returnType, Relation::class) || is_subclass_of($returnType, Relation::class));
     }
