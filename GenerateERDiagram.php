@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\File;
@@ -160,18 +162,54 @@ class GenerateERDiagram extends Command {
             // Restore the original saving method.
             $modelClass::saving($savingMethod);
 
-            if (!$this->map->has($modelClass)) $this->map->put($modelClass, collect());
+            if (!$this->map->has($modelClass)) {
+                $this->map->put($modelClass, collect([
+                    'metadata' => collect([
+                        'table' => $modelInstance->getTable(),
+                        'class' => $modelClass,
+                    ]),
+                    'relations' => collect(),
+                ]));
+            }
 
-            $relationMethods->each(function ($type, $relation) use ($modelClass, $modelInstance) {
-                $this->map->get($modelClass)->put($relation, [
-                    'table' => $modelInstance->$relation()->getRelated()->getTable(),
-                ]);
-            });
+            $relationMethods
+                ->keys()
+                ->each(function ($relation) use ($modelClass, $modelInstance) {
+                    $data = collect();
+
+                    $relationBuilder = $modelInstance->$relation();
+
+                    $isPivot = is_a($relationBuilder, BelongsToMany::class) || is_subclass_of($relationBuilder, BelongsToMany::class);
+
+                    $data->put('isPivot', $isPivot);
+                    $data->put('relatedModel', get_class($relationBuilder->getRelated()));
+
+                    if ($isPivot) {
+                        $data->put('foreignKey', $relationBuilder->getForeignPivotKeyName());
+                        $data->put('parentKey', $relationBuilder->getParentKeyName());
+                        $data->put('relatedPivotKey', $relationBuilder->getRelatedPivotKeyName());
+                        $data->put('relatedKey', $relationBuilder->getRelatedKeyName());
+                        $data->put('table', $relationBuilder->getTable());
+                    } else {
+                        $localKey = is_a($relationBuilder, BelongsTo::class)
+                            ? $relationBuilder->getOwnerKeyName()
+                            : $relationBuilder->getLocalKeyName();
+
+                        $data->put('foreignKey', $relationBuilder->getForeignKeyName());
+                        $data->put('localKey', $localKey);
+                    }
+
+                    $this
+                        ->map
+                        ->get($modelClass)
+                        ->get('relations')
+                        ->put($relation, $data);
+                });
         });
 
         DB::rollBack();
 
-        dd($this->map);
+        dd($this->map->values()->toArray());
 
         return Command::SUCCESS;
     }
