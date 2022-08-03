@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace LaravelRelationSniffer;
 
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -8,29 +8,15 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Collection;
-use Illuminate\Console\Command;
 
 use ReflectionClass;
 use Throwable;
 use Closure;
 use Str;
+use Log;
 use DB;
 
-class GenerateERDiagram extends Command {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'erd:generate';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Generate an ERD diagram from all models';
-
+class LaravelRelationSniffer {
     /**
      * The methods to ignore for their models.
      *
@@ -57,11 +43,18 @@ class GenerateERDiagram extends Command {
 
     /**
      * Construct this class.
+     *
+     * @param ?array $nonRelationalMethods
      */
-    public function __construct() {
-        parent::__construct();
-
+    public function __construct(?array $nonRelationalMethods = []) {
         $this->map = collect();
+
+        foreach ($nonRelationalMethods as $modelName => $methods) {
+            $this->nonRelationalMethods[$modelName] = array_unique(array_merge(
+                $this->nonRelationalMethods[$modelName] ?? [],
+                $methods
+            ));
+        }
     }
 
     /**
@@ -99,11 +92,11 @@ class GenerateERDiagram extends Command {
     }
 
     /**
-     * Execute the console command.
+     * Sniff for relations.
      *
-     * @return int
+     * @return void
      */
-    public function handle() {
+    public function sniff(): array {
         DB::beginTransaction();
 
         $nonRelationalMethods = collect($this->nonRelationalMethods);
@@ -137,7 +130,7 @@ class GenerateERDiagram extends Command {
 
                     if ($method->isStatic()) return $acc;
                     if (!$method->isPublic()) return $acc;
-                    if (str_starts_with($methodName, '__')) return $acc;
+                    if (Str::startsWith($methodName, '__')) return $acc;
                     if ($method->getNumberOfParameters() > 0) return $acc;
 
                     $returnType = $method->getReturnType();
@@ -153,17 +146,15 @@ class GenerateERDiagram extends Command {
 
                         $returnType = get_class($returnValue);
                     } catch (Throwable $e) {
-                        $this->error($methodName . ' - failed');
+                        Log::error($methodName . ' - failed');
 
                         $errorMessage = $e->getMessage();
 
-                        $this->error($errorMessage);
+                        Log::error($errorMessage);
 
                         if (Str::startsWith($errorMessage, 'Class "') && Str::endsWith($errorMessage, ' not found')) {
-                            $this->info('- This could be due to an incorrect relation setup');
+                            Log::info('- This could be due to an incorrect relation setup');
                         }
-
-                        $this->newLine();
                     }
 
                     if (!$this->validateRelation($returnType)) return $acc;
@@ -221,8 +212,6 @@ class GenerateERDiagram extends Command {
 
         DB::rollBack();
 
-        dd($this->map->values()->toArray());
-
-        return Command::SUCCESS;
+        return $this->map->values()->toArray();
     }
 }
