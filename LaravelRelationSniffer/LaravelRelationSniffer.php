@@ -18,6 +18,13 @@ use Closure;
 
 class LaravelRelationSniffer {
     /**
+     * The map of relations.
+     *
+     * @var \Illuminate\Support\Collection
+     */
+    private $map;
+
+    /**
      * The methods to ignore for their models.
      *
      * @var array
@@ -25,6 +32,7 @@ class LaravelRelationSniffer {
     private $nonRelationalMethods = [
         '*' => [
             'save',
+            'update',
             'delete',
             'forceDelete',
         ],
@@ -35,13 +43,6 @@ class LaravelRelationSniffer {
     ];
 
     /**
-     * The map of relations.
-     *
-     * @var \Illuminate\Support\Collection
-     */
-    private $map;
-
-    /**
      * Construct this class.
      *
      * @param ?array $nonRelationalMethods
@@ -49,12 +50,7 @@ class LaravelRelationSniffer {
     public function __construct(?array $nonRelationalMethods = []) {
         $this->map = collect();
 
-        foreach ($nonRelationalMethods as $modelName => $methods) {
-            $this->nonRelationalMethods[$modelName] = array_unique(array_merge(
-                $this->nonRelationalMethods[$modelName] ?? [],
-                $methods
-            ));
-        }
+        $this->setNonRelationalMethods($nonRelationalMethods);
     }
 
     /**
@@ -89,6 +85,17 @@ class LaravelRelationSniffer {
      */
     private function validateRelation(mixed $returnType): bool {
         return $returnType !== null && (is_a($returnType, Relation::class) || is_subclass_of($returnType, Relation::class));
+    }
+
+    /**
+     * Set the non relational methods.
+     *
+     * @param array $nonRelationalMethods
+     *
+     * @return void
+     */
+    public function setNonRelationalMethods(array $nonRelationalMethods): void {
+        $this->nonRelationalMethods = $nonRelationalMethods;
     }
 
     /**
