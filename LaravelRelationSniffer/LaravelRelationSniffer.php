@@ -101,7 +101,7 @@ class LaravelRelationSniffer {
     /**
      * Sniff for relations.
      *
-     * @return void
+     * @return array
      */
     public function sniff(): array {
         DB::beginTransaction();
