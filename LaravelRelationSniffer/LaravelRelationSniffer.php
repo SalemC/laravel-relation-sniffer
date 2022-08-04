@@ -14,7 +14,6 @@ use Illuminate\Support\Str;
 
 use ReflectionClass;
 use Throwable;
-use Closure;
 
 class LaravelRelationSniffer {
     /**
@@ -113,15 +112,9 @@ class LaravelRelationSniffer {
         $this->getReflectedModels()->each(function ($model) use ($nonRelationalMethods) {
             $modelClass = $model->getName();
 
-            // Create a copy of any existing 'saving' methods for every model.
-            $savingMethod = Closure::fromCallable([$modelClass, 'saving']);
-
             $modelInstance = app()->make($modelClass);
 
-            // Prevent database changes occuring while scanning for relations.
-            $modelClass::saving(fn () => false);
-
-            $relationMethods = collect($model->getMethods())
+            $relationMethods = $modelClass::withoutEvents(fn () => collect($model->getMethods())
                 ->filter(function ($method) use ($nonRelationalMethods, $modelClass) {
                     $methodName = $method->getName();
 
@@ -167,10 +160,7 @@ class LaravelRelationSniffer {
                     if (!$this->validateRelation($returnType)) return $acc;
 
                     return $acc->put($methodName, $returnType);
-                }, collect());
-
-            // Restore the original saving method.
-            $modelClass::saving($savingMethod);
+                }, collect()));
 
             if (!$this->map->has($modelClass)) {
                 $this->map->put($modelClass, collect([
