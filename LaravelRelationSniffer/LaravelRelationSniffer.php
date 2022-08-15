@@ -21,14 +21,14 @@ class LaravelRelationSniffer {
      *
      * @var \Illuminate\Support\Collection
      */
-    private $map;
+    private Collection $map;
 
     /**
      * The methods to ignore for their models.
      *
      * @var array
      */
-    private $nonRelationalMethods = [
+    private array $nonRelationalMethods = [
         '*' => [
             'save',
             'update',
@@ -107,8 +107,6 @@ class LaravelRelationSniffer {
 
         $nonRelationalMethods = collect($this->nonRelationalMethods);
 
-        // @todo add methods to ignore for each model
-        // @todo ignore pivot models?
         $this->getReflectedModels()->each(function ($model) use ($nonRelationalMethods) {
             $modelClass = $model->getName();
 
@@ -182,6 +180,7 @@ class LaravelRelationSniffer {
                     $isPivot = is_a($relationBuilder, BelongsToMany::class) || is_subclass_of($relationBuilder, BelongsToMany::class);
 
                     $data->put('isPivot', $isPivot);
+                    $data->put('type', get_class($relationBuilder));
                     $data->put('relatedModel', get_class($relationBuilder->getRelated()));
 
                     if ($isPivot) {
